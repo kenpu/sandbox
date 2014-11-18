@@ -21,7 +21,7 @@ func (p *Printer) Visit(node ast.Node) (w ast.Visitor) {
 		p.indent += 1
 		node_t := reflect.TypeOf(node)
 		for i := 0; i < p.indent; i++ {
-			fmt.Print(" ")
+			fmt.Print("|  ")
 		}
 		fmt.Printf("[%s] %s", node_t, node)
 		fmt.Println()
@@ -31,7 +31,8 @@ func (p *Printer) Visit(node ast.Node) (w ast.Visitor) {
 
 func main() {
 	fset := token.NewFileSet()
-	if f, err := parser.ParseFile(fset, os.Args[1], nil, 0); err == nil {
+	if f, err := parser.ParseFile(fset, os.Args[1], nil,
+		parser.ParseComments); err == nil {
 		p := &Printer{}
 		ast.Walk(p, f)
 	} else {

@@ -1,0 +1,14 @@
+package main
+
+import (
+	"fmt"
+)
+
+func main() {
+	var x = 10     // kenpu
+	var y int = 10 // jackbauer
+    {
+        z := x+y 
+    }
+	fmt.Println(x, y, z)
+}
