@@ -1,0 +1,11 @@
+<h2> Posts </h2>
+<ul>
+{{ range where .Data.Pages "Type" "posts" }}
+<li> 
+    <h3> 
+        <a href="{{.Permalink}}">{{.Title}}</a>
+    </h3>
+    <p> {{.Summary}}</p>
+</li>
+{{ end }}
+</ul>

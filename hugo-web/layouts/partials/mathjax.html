@@ -1,0 +1,35 @@
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    extensions: ["tex2jax.js"],
+    jax: ["input/TeX", "output/HTML-CSS"],
+    elements: [],
+    skipStartupTypeset: false,
+    /*
+    "HTML-CSS": {
+        scale: 83,
+    },
+    */
+    //showMathMenu: false,
+    //zoom: "None",
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+      processEscapes: true,
+      skipTags: ["script", 
+      "noscript", 
+      "style", 
+      "textarea", 
+      "nomath", 
+      //"pre",
+      ],
+      // nomathjax used by (code ...) component
+      ignoreClass: "nomath|nomathjax|tex2jax_ignore", 
+    },
+    /*
+    TeX: {
+        equationNumbers: {autoNumber: "AMS"},
+    },
+    */
+  });
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js"></script>

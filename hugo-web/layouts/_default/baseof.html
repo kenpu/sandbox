@@ -1,0 +1,10 @@
+<html>
+    <head>
+        {{ partial "site-header.html" . }}
+        {{ block "head" . -}}{{- end}}
+    </head>
+    <body>
+        {{ block "main" . -}}{{- end}}
+        {{ partial "site-footer.html" . }}
+    </body>
+</html>

@@ -1,0 +1,6 @@
+{{ define "main" }}
+    <div class="{{ .Type }}">
+        {{- .Content -}}
+    </div>
+	{{ partial "mathjax.html" . }}
+{{ end }}

@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css?family=VT323');
+
+body {
+    font-size: 200%;
+    font-family: VT323;
+}
+
+table {
+    font-size: inherit;
+}
+
+pre, code {
+    font-family: "VT323";
+    overflow: hidden;
+}
+
+.posts {
+    max-width: 500px;
+}
