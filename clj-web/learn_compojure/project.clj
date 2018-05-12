@@ -10,6 +10,7 @@
                  [compojure "1.6.1"]
                  [cheshire "5.8.0"]
                  [environ "1.1.0"]
+                 [stuarth/clj-oauth2 "0.3.2"]
                  [org.clojure/tools.logging "0.4.1"]]
   :plugins [[lein-environ "1.1.0"]]
   :main learn-compojure.core

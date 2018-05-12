@@ -8,9 +8,11 @@
           [:link {:rel "stylesheet" :href "static/style.css"}]]
          [:body (apply v args)]]))
 
-(defn index [name]
+(defn index [name access-token user-info]
   [:div
    [:p "This is " name]
+   [:p "Access Token: " access-token]
+   [:pre "User info\n" (str user-info)]
    [:ul
     [:li [:a {:href "session"} "session"]]
     [:li [:a {:href "oauth2/google"} "Login/Google"]]

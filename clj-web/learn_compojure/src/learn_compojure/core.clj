@@ -8,9 +8,11 @@
             [ring.middleware.cookies :refer [wrap-cookies]]
             [ring.middleware.oauth2 :refer [wrap-oauth2]]
             [ring.middleware.params :refer [wrap-params]]
+            [ring.middleware.defaults :refer :all]
             [clojure.tools.logging :as log]
             [cheshire.core :as parse]
             [environ.core :refer [env]]
+            [clj-http.client :as client]
             [learn-compojure.view :as view])
   (:use ring.adapter.jetty))
 
@@ -36,13 +38,25 @@
             :redirect-uri     "/oauth2/github/callback" 
             :landing-uri      "/"}})
 
+(defn- google-userinfo [access-token]
+  (let [token (:token access-token)]
+    (-> "https://www.googleapis.com/oauth2/v2/userinfo"
+        (client/get {:headers {"Authorization" (str "Bearer " token)}})
+        (get :body))))
+
 (defroutes app
           (GET "/" r 
-               (view/page view/index (env :profile-name)))
+               (let [access-token (-> r :oauth2/access-tokens :google)
+                     user-info (if access-token
+                                 (google-userinfo access-token)
+                                 "N/A")]
+                 (view/page view/index (env :profile) access-token user-info)))
+
           (GET "/clear" req
                (-> (view/page view/clear)
                    (response/response)
                    (assoc :session nil)))
+
           (GET "/set-session" _
                (-> (response/redirect "/session")
                    (assoc :session {::title "Hi there"})))
@@ -51,6 +65,7 @@
                (let [session (:session req)]
                  (-> (view/page view/session session)
                      (response/response)
+                     (response/content-type "text/html")
                      (assoc :session 
                             (update session 
                                     :counter 
@@ -67,13 +82,10 @@
     (log/spyf :info "> %s" (:uri r))
     (handler r)))
 
+(def site (wrap-oauth2 app (merge github-oauth2 google-oauth2)))
+
 (defn -main [& args]
-  (run-jetty (-> #'app
-                 (wrap-oauth2 (merge github-oauth2 google-oauth2))
-                 (wrap-session {:store (cookie-store)
-                                :cookie-attrs {:same-site :lax}})
-                 (wrap-log)
-                 (wrap-params)
-                 (wrap-reload)
-                 )
+  (run-jetty (-> #'site
+                 (wrap-defaults (-> site-defaults (assoc-in [:session :cookie-attrs :same-site] :lax)))
+                 (wrap-reload))
              {:port 9876}))
