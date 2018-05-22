@@ -10,3 +10,8 @@ pg:
 		-p 6432:5432 \
 		postgres
 
+psql:
+	psql -h localhost -p 6432 -U cljdb -d mydb
+
+migrate:
+	lein migratus migrate
