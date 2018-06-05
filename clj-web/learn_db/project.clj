@@ -1,4 +1,4 @@
-(defproject learn_webdb "0.1.0-SNAPSHOT"
+(defproject learn_db "0.1.0-SNAPSHOT"
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/java.jdbc "0.7.6"]
                  [org.postgresql/postgresql "LATEST"]

@@ -1,4 +1,4 @@
-(ns learn-webdb.core
+(ns learn-db.core
   (require [clojure.java.jdbc :as sql]))
 
 (def db {:subprotocol "postgresql"
