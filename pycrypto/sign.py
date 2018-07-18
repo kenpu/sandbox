@@ -42,3 +42,8 @@ if __name__ == '__main__':
     print(TrustA.verify(d1))
     print(TrustB.verify(d2))
 
+    sig = d2[1][0]
+    print(type(sig))
+    print(sig)
+    print(len(str(sig)))
+
