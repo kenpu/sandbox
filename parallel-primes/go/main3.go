@@ -36,16 +36,17 @@ func makeprimes(cancel chan struct{}, primes chan int, parallelism int) (done ch
 	var (
 		count   *Counter
 		numbers chan int
+		wg      = &sync.WaitGroup{}
 	)
 	count = &Counter{}
 	done = make(chan struct{})
+	wg.Add(parallelism)
 
 	numbers = make(chan int)
 	go func() {
 		for i := 2; true; i++ {
 			select {
 			case <-cancel:
-				close(done)
 				return
 			case <-done:
 				return
@@ -55,22 +56,30 @@ func makeprimes(cancel chan struct{}, primes chan int, parallelism int) (done ch
 	}()
 
 	for id := 0; id < parallelism; id++ {
-		go worker(id, cancel, done, numbers, primes, count)
+		go worker(id, wg, cancel, numbers, primes, count)
 	}
+
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
 	return done
 }
-func worker(id int, cancel chan struct{}, done chan struct{}, numbers chan int, primes chan int, count *Counter) {
+func worker(id int, wg *sync.WaitGroup, cancel chan struct{}, numbers chan int, primes chan int, count *Counter) {
+	defer wg.Done()
 	for i := range numbers {
 		if isprime(i) {
 			select {
 			case <-cancel:
+				fmt.Printf("worker [%d] cancelled\n", id)
 				return
-			case <-done:
+			default:
+			}
+			primes <- i
+			if count.Inc() >= N {
+				fmt.Printf("worker [%d] completed\n", id)
 				return
-			case primes <- i:
-				if count.Inc() >= N {
-					close(done)
-				}
 			}
 		}
 	}
@@ -98,6 +107,7 @@ func main() {
 		}
 	}()
 
+	// start mining for primes
 	fmt.Printf("=== parallelism: %d ===\n", parallelism)
 	done = makeprimes(cancel, primes, parallelism)
 
@@ -112,6 +122,9 @@ func main() {
 	for pn = range primes {
 		count += 1
 		select {
+		case <-done:
+			fmt.Println("DONE...")
+			break
 		case <-ticks:
 			dur := time.Now().Sub(start)
 			rate := float64(count) / dur.Seconds()
