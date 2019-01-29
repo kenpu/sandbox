@@ -2,3 +2,6 @@
 *.class
 node_modules
 __pycache__
+build/
+.gradle/
+target/
