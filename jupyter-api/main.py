@@ -1,4 +1,5 @@
 import nbformat
+import nbconvert
 from nbconvert.preprocessors import ExecutePreprocessor
 import re
 
@@ -28,7 +29,18 @@ def run(in_path, out_path):
     with open(out_path, 'wt') as f:
         nbformat.write(nb, f)
 
+def to_pdf(in_path, out_path):
+    with open(in_path) as f:
+        nb = nbformat.read(f, as_version=4)
+
+    exporter = nbconvert.PDFExporter()
+    (pdf, resources) = exporter.from_notebook_node(nb)
+
+    with open(out_path, 'wb') as f:
+        f.write(pdf)
+
 if __name__ == '__main__':
     stats('a.ipynb')
-    run('a.ipynb', 'b.ipynb')
-    stats('b.ipynb')
+    run('a.ipynb', 'output/b.ipynb')
+    stats('output/b.ipynb')
+    to_pdf('output/b.ipynb', 'output/b.pdf')
