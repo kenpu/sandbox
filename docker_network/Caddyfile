@@ -1,0 +1,10 @@
+:8000 {
+    route /jupyter/* {
+        uri strip_prefix /jupyter
+        reverse_proxy jupyter:8000
+    }
+    route /saturn/* {
+        uri strip_prefix /saturn
+        reverse_proxy saturn:8000
+    }
+}

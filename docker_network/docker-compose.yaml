@@ -1,0 +1,17 @@
+version: "3"
+services:
+    jupyter:
+        image: kenpu/base
+        working_dir: /usr/bin
+        command: python3 -m http.server 8000
+    saturn:
+        image: kenpu/base
+        working_dir: /
+        command: python3 -m http.server 8000
+    solar:
+        image: caddy
+        volumes:
+            - ./Caddyfile:/etc/caddy/Caddyfile
+        ports:
+            - 8000:8000
+

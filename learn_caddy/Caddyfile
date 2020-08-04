@@ -1,0 +1,4 @@
+:8000
+
+reverse_proxy / http://localhost:9000
+reverse_proxy /dir2/* http://localhost:9001
