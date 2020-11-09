@@ -13,5 +13,5 @@ services:
         volumes:
             - ./Caddyfile:/etc/caddy/Caddyfile
         ports:
-            - 8000:8000
+            - ${PORT}:8000
 
