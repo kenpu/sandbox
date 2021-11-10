@@ -1,0 +1,10 @@
+Type: Jupyter Notebook Extension
+Compatibility: 3.x, 4.x, 5.x, 6.x
+Name: Hello World
+Main: main.js
+Link: README.md
+Description: |
+    Hello world extension for Jupyter Notebook
+
+Parameters:
+    - none
