@@ -1,0 +1,53 @@
+[project]
+name = "multimodal-ai"
+version = "0.1.0"
+description = "A collection of Typer CLI applications"
+readme = "README.md"
+authors = [
+    { name = "Ken Pu", email = "kenpu@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "chatterbox-tts>=0.1.7",
+    "en-core-web-sm",
+    "faster-whisper>=1.2.1",
+    "kokoro>=0.9.4",
+    "numpy>=2.5.3",
+    "nvidia-cublas-cu12>=12.9.2.10",
+    "pydantic>=2.14.0",
+    "python-dotenv>=1.2.4",
+    "pyyaml>=6.0.3",
+    "rich>=15.0.0",
+    "silero-vad>=6.2.3",
+    "sounddevice>=0.5.6",
+    "soundfile>=0.14.0",
+    "typer>=0.27.3",
+]
+
+[project.scripts]
+main = "multimodal_ai.main:app"
+
+[build-system]
+requires = ["uv_build>=0.9.28,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[tool.uv.sources]
+en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+
+[tool.uv]
+# chatterbox-tts pins torch==2.6.0 / torchaudio==2.6.0 on Python < 3.14 (its own
+# metadata allows >=2.9 on 3.14). Override so it shares our torch 2.14 (CUDA 13).
+override-dependencies = ["torch>=2.9", "torchaudio>=2.9"]
+# resemble-perth (chatterbox's watermarker) imports pkg_resources, which newer
+# setuptools no longer ships; without it chatterbox fails to load.
+constraint-dependencies = ["setuptools<81"]
+
+[tool.ruff.lint.flake8-bugbear]
+# typer.Option/Argument in defaults is Typer's intended idiom, not a bug.
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
