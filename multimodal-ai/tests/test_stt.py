@@ -1,24 +1,9 @@
-import importlib.util
-
 import numpy as np
 import pytest
 
 from multimodal_ai.services import stt
 from multimodal_ai.services.tts.kokoro import KokoroTTS
 from multimodal_ai.services.types import Block
-
-# The same tests run once per engine. faster-whisper is optional
-# (`uv sync --extra faster-whisper`); without it, its runs are skipped.
-ENGINES = [
-    "transformers",
-    pytest.param(
-        "faster-whisper",
-        marks=pytest.mark.skipif(
-            importlib.util.find_spec("faster_whisper") is None,
-            reason="faster-whisper extra not installed",
-        ),
-    ),
-]
 
 
 @pytest.fixture(scope="module")
@@ -36,9 +21,8 @@ def test_stt_is_abstract():
         stt.STT()
 
 
-@pytest.mark.parametrize("engine", ENGINES)
-def test_word_timings(engine, speech):
-    words = stt.load(engine, "tiny.en").transcribe(speech)
+def test_word_timings(speech):
+    words = stt.load("tiny.en").transcribe(speech)
     text = "".join(w.word for w in words).strip().lower()
     assert text.startswith("the quick brown fox")
     starts = [w.start for w in words]
@@ -47,8 +31,7 @@ def test_word_timings(engine, speech):
     assert words[-1].end <= len(speech) / 16000 + 0.1
 
 
-@pytest.mark.parametrize("engine", ENGINES)
-def test_transcribe_keeps_utterance_timing(engine):
+def test_transcribe_keeps_utterance_timing():
     # Silence: we check structure, not text.
     blocks = [
         Block(
@@ -62,7 +45,7 @@ def test_transcribe_keeps_utterance_timing(engine):
     ]
     utterance = stt.make_utterance(7, blocks)
     assert (utterance.first_block, utterance.last_block) == (10, 40)
-    t = stt.transcribe(stt.load(engine, "tiny.en", device="cpu"), utterance)
+    t = stt.transcribe(stt.load("tiny.en", device="cpu"), utterance)
     assert t.utterance_id == 7
     assert t.start == 10 * 0.032
     assert t.duration == 31 * 0.032

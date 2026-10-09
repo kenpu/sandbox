@@ -1,10 +1,8 @@
 """Speech-to-text services: audio devices, microphone capture, voice activity,
-and the `STT` interface. Engines live in submodules, like the TTS engines:
-`transformers_whisper.TransformersWhisper` (the default) and
-`faster_whisper.FasterWhisper` (optional; `uv sync --extra faster-whisper`).
+and the `STT` interface. Engines live in submodules, like the TTS engines;
+there is one: `transformers_whisper.TransformersWhisper`.
 """
 
-import importlib
 import itertools
 import math
 import queue
@@ -46,21 +44,12 @@ class STT(ABC):
         """Transcribe audio of any length into timed words."""
 
 
-# Engine name -> "module:class", imported only when chosen: each engine pulls
-# in heavy libraries (torch, CTranslate2), and faster-whisper may not be installed.
-ENGINES = {
-    "transformers": "transformers_whisper:TransformersWhisper",
-    "faster-whisper": "faster_whisper:FasterWhisper",
-}
+def load(model: str = "small.en", device: str | None = None) -> STT:
+    """Create and initialize the STT engine."""
+    # Imported here, not at the top: it pulls in torch and transformers (slow).
+    from multimodal_ai.services.stt.transformers_whisper import TransformersWhisper
 
-
-def load(
-    engine: str = "transformers", model: str = "small.en", device: str | None = None
-) -> STT:
-    """Create and initialize the STT engine named `engine` (a key of ENGINES)."""
-    module_name, class_name = ENGINES[engine].split(":")
-    module = importlib.import_module(f"{__name__}.{module_name}")
-    stt: STT = getattr(module, class_name)()
+    stt = TransformersWhisper()
     stt.initialize(model, device)
     return stt
 

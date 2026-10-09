@@ -31,9 +31,6 @@ system-deps: ## Install PortAudio if missing (Debian/Ubuntu, needs sudo)
 sync: ## Create .venv and install the Python dependencies
 	uv sync
 
-sync-faster-whisper: ## Like sync, plus the optional faster-whisper STT engine
-	uv sync --extra faster-whisper
-
 models: ## Pre-download model weights (~4 GB) into ~/.cache/huggingface
 	uv run hf download openai/whisper-small.en config.json generation_config.json \
 		model.safetensors preprocessor_config.json tokenizer.json tokenizer_config.json \
@@ -64,9 +61,6 @@ listen: ## Live mic level and voice activity
 
 transcribe: ## Live speech-to-text
 	$(MAIN) sound listen --stt
-
-transcribe-fw: ## Live speech-to-text with faster-whisper (needs sync-faster-whisper)
-	$(MAIN) sound listen --stt --stt-engine faster-whisper
 
 echo: ## Live speech-to-text, spoken back with TTS (headset recommended)
 	$(MAIN) sound listen --stt --tts

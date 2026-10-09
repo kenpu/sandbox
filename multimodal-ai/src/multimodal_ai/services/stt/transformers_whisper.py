@@ -1,8 +1,7 @@
-"""Whisper on torch via Hugging Face transformers: the default STT engine.
+"""Whisper on torch via Hugging Face transformers: the STT engine.
 
-It runs on the GPU wherever torch does (including ARM, where faster-whisper's
-PyPI CTranslate2 has no CUDA). On the GB10 it is as fast as faster-whisper on
-a CUDA build of CTranslate2; see the README's benchmark.
+It runs on the GPU wherever torch does, x86 and ARM alike. (faster-whisper's
+CTranslate2 has no CUDA in its ARM wheels; see the README.)
 """
 
 import itertools

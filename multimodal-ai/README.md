@@ -3,9 +3,8 @@
 A learning playground for local speech AI, driven from one CLI (`main`):
 
 - **listen**: live microphone level, voice activity detection ([Silero VAD](https://github.com/snakers4/silero-vad)),
-  speech-to-text ([Whisper](https://huggingface.co/openai/whisper-small.en) with word timestamps,
-  on torch via transformers, or optionally [faster-whisper](https://github.com/SYSTRAN/faster-whisper)),
-  and optionally speaking each transcript back.
+  speech-to-text ([Whisper](https://huggingface.co/openai/whisper-small.en) on torch via transformers,
+  with word timestamps), and optionally speaking each transcript back.
 - **say**: text-to-speech with [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (54 voices)
   or [Chatterbox](https://huggingface.co/ResembleAI/chatterbox) (clones a voice from a short recording).
 - **record**: record the mic to a file, e.g. a reference clip for voice cloning.
@@ -31,7 +30,6 @@ make              # list all targets
 | `make devices` | List audio devices |
 | `make listen` | Live mic level and voice activity |
 | `make transcribe` | Live speech-to-text |
-| `make transcribe-fw` | The same with faster-whisper (after `make sync-faster-whisper`) |
 | `make echo` | Speech-to-text, spoken back (use a headset) |
 | `make say TEXT="Hello"` | Speak with kokoro; add `VOICE=bm_george` to change voice |
 | `make voices` | List kokoro voices |
@@ -56,8 +54,7 @@ src/multimodal_ai/
   services/types.py    # pydantic data models and pipeline messages
   services/bus.py      # message Bus and the thread-based Component
   services/pipeline.py # listen's components: Listen, Stt, Tts
-  services/stt/        # audio capture, VAD, the STT interface, plus
-                       #   transformers_whisper.py and faster_whisper.py
+  services/stt/        # audio capture, VAD, the STT interface, transformers_whisper.py
   services/tts/        # the TTS interface, plus kokoro.py and chatterbox.py
 notes/                 # task notes
 tests/
@@ -73,29 +70,19 @@ To add a sub-app: create `apps/<name>.py` with `app = typer.Typer()` and mount i
 - `override-dependencies`: chatterbox pins `torch==2.6.0`; overridden to `>=2.9`.
 - `constraint-dependencies`: `setuptools<81`, because chatterbox's watermarker still imports `pkg_resources`.
 
-## Speech-to-text engines
+## Speech-to-text
 
-`listen --stt-engine` picks one; both return words with start/end times.
+Whisper runs on torch via transformers, on the GPU wherever torch has CUDA (x86 and ARM).
+Word timestamps come from one extra decoder pass over the alignment heads plus dynamic
+time warping, as in OpenAI's `whisper/timing.py` (transformers' own pipeline was ~10x slower).
 
-- `transformers` (default): Whisper on torch. Runs on the GPU wherever torch does. Its word
-  timestamps come from one extra decoder pass over the alignment heads plus dynamic time
-  warping, as in OpenAI's `whisper/timing.py` (transformers' own pipeline was ~10x slower).
-- `faster-whisper` (optional extra): Whisper on CTranslate2. PyPI's CTranslate2 wheels for
-  ARM Linux have no CUDA, so on the DGX Spark (aarch64, GB10) the extra installs a local
-  CUDA build instead: `[tool.uv.sources]` points `ctranslate2` at
-  `~/src/opt/wheels/ctranslate2-4.8.2-cp313-cp313-linux_aarch64.whl` for Python 3.13 on
-  aarch64 Linux. How that wheel was built: `~/src/README.md`. Other platforms use PyPI.
-  PyPI's x86 CTranslate2 is built for CUDA 12, so on x86 the extra also installs
-  `nvidia-cublas-cu12`, which the engine preloads (torch itself brings CUDA 13).
-
-A plain `uv sync` (`make sync`) removes the extra again; use `make sync-faster-whisper`.
-
+Why not faster-whisper: it runs on CTranslate2, whose PyPI wheels for ARM Linux have no
+CUDA. A CUDA build from source works on the DGX Spark (GB10) but was no faster, and a
+local wheel in `[tool.uv.sources]` breaks `uv sync` on every machine that lacks it.
 Benchmark on the GB10 (`small.en`, greedy, word timestamps; median seconds of 5 runs):
 
-| Audio | faster-whisper CPU int8 | faster-whisper GPU float16 | transformers GPU |
+| Audio | faster-whisper CPU int8 | faster-whisper GPU float16 (local build) | transformers GPU |
 |---|---|---|---|
 | 3.4 s | 0.99 | 0.106 | 0.084 |
 | 7.7 s | 1.29 | 0.169 | 0.145 |
 | 25.9 s | 1.99 | 0.432 | 0.394 |
-
-Both transcribed every clip correctly, and their word times agree within ~10 ms on average.
