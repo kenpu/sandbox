@@ -11,6 +11,8 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
+from multimodal_ai.services.types import SpokenWord
+
 
 class TTS(ABC):
     # Sample rate (Hz) of the audio returned by `synthesize`. A plain class
@@ -28,3 +30,9 @@ class TTS(ABC):
     @abstractmethod
     def synthesize(self, text: str) -> np.ndarray:
         """Speak `text`; return mono float32 samples at `self.samplerate`."""
+
+    # Not abstract: a default that engines may override. Engines that know
+    # when each word is spoken (kokoro) return timings; others return none.
+    def synthesize_timed(self, text: str) -> tuple[np.ndarray, list[SpokenWord]]:
+        """Like `synthesize`, plus the timing of each word in the audio."""
+        return self.synthesize(text), []

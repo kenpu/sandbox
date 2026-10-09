@@ -4,6 +4,8 @@ import ctypes
 import itertools
 import math
 import queue
+import time
+import unicodedata
 import warnings
 from collections import deque
 from collections.abc import Callable
@@ -18,6 +20,7 @@ from multimodal_ai.services.types import (
     Device,
     StreamConfig,
     Transcript,
+    Utterance,
     VadConfig,
     VadEvent,
 )
@@ -177,21 +180,49 @@ def speech_collector(pre_speech_ms: int = 300) -> Callable[[Block], list[Block] 
     return collect
 
 
-def transcribe(model, blocks: list[Block]) -> Transcript:
-    """Join the blocks' samples into one array and transcribe it."""
+def normalize(text: str) -> str:
+    """Lowercase, drop all punctuation, trim: "Terminate." -> "terminate".
+
+    Unicode categories starting with "P" are punctuation (. , ! ? … — " etc.).
+    """
+    kept = (c for c in text.lower() if not unicodedata.category(c).startswith("P"))
+    return "".join(kept).strip()
+
+
+def make_utterance(id: int, blocks: list[Block]) -> Utterance:
+    """Join the blocks' samples into one Utterance."""
     config = StreamConfig()
     audio = np.concatenate([b.indata for b in blocks])
+    return Utterance(
+        id=id,
+        first_block=blocks[0].index,
+        last_block=blocks[-1].index,
+        start=blocks[0].index * config.block_duration,
+        duration=len(audio) / config.samplerate,
+        audio=audio,
+    )
+
+
+def transcribe(model, utterance: Utterance) -> Transcript:
+    """Transcribe an utterance; the result keeps the utterance's id and timing."""
+    t0 = time.perf_counter()
     # word_timestamps=True: after decoding, whisper aligns each word to the
     # audio (cross-attention + dynamic time warping), filling Segment.words.
     segments, info = model.transcribe(
-        audio, language="en", beam_size=1, vad_filter=False, word_timestamps=True
+        utterance.audio,
+        language="en",
+        beam_size=1,
+        vad_filter=False,
+        word_timestamps=True,
     )
     # `segments` is a lazy generator: the decoding happens as we iterate it.
     seg_dicts = [asdict(s) for s in segments]
     return Transcript(
-        start=blocks[0].index * config.block_duration,
-        duration=len(audio) / config.samplerate,
+        utterance_id=utterance.id,
+        start=utterance.start,
+        duration=utterance.duration,
         text="".join(s["text"] for s in seg_dicts).strip(),
+        transcribe_seconds=time.perf_counter() - t0,
         segments=seg_dicts,
         info=asdict(info),
     )

@@ -13,23 +13,21 @@ import soundfile as sf
 import typer
 import yaml
 from pydantic import ValidationError
-from rich.console import Console, Group
+from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
-from rich.rule import Rule
 from rich.table import Table
-from rich.text import Text
 
 from multimodal_ai.keyboard import keypress
+from multimodal_ai.services import pipeline
 from multimodal_ai.services import stt as stt_service
+from multimodal_ai.services.bus import Bus, Component
 from multimodal_ai.services.tts import TTS, chatterbox, kokoro
 from multimodal_ai.services.types import (
-    Block,
-    StreamConfig,
-    Transcript,
+    Shutdown,
     VadConfig,
-    VadEvent,
 )
+from multimodal_ai.ui import RichUI, YamlUI, level_bar
 
 app = typer.Typer(help="Sound input/output.", no_args_is_help=True)
 
@@ -67,51 +65,6 @@ def devices(
     Console().print(table)
 
 
-def level_bar(rms: float, width: int = 40) -> str:
-    """Map RMS to a dBFS meter spanning -60..0 dB."""
-    db = 20 * np.log10(max(rms, 1e-10))
-    n = int(width * min(max((db + 60) / 60, 0), 1))
-    return f"[green]{'█' * n}[/][dim]{'·' * (width - n)}[/] {db:6.1f} dBFS"
-
-
-def render(
-    b: Block,
-    level: float,
-    speaking: bool | None,
-    last: VadEvent | None,
-    transcript: Transcript | None,
-    stt_on: bool,
-    tts_status: str,
-) -> Panel:
-    grid = Table.grid(padding=(0, 2))
-    grid.add_row("block", str(b.index))
-    grid.add_row("adc time", f"{b.adc_time:.3f} s")
-    grid.add_row("current time", f"{b.current_time:.3f} s")
-    grid.add_row("latency", f"{(b.current_time - b.adc_time) * 1000:.1f} ms")
-    grid.add_row("rms", f"{level:.5f}  {level_bar(level)}")
-    if speaking is None:
-        grid.add_row("vad", "[dim]off[/]")
-    else:
-        grid.add_row(
-            "vad", "[bold red]● speech[/]" if speaking else "[dim]○ silence[/]"
-        )
-        if last:
-            grid.add_row("last event", f"{last.kind} @ {last.seconds:.3f} s")
-    grid.add_row("tts", tts_status)
-
-    # Text(...) shows the transcript literally; a plain str would be parsed as
-    # rich markup, so e.g. "[laughs]" would vanish.
-    if transcript:
-        latest = Text(transcript.text)
-    else:
-        latest = Text("no transcription yet" if stt_on else "stt off", style="dim")
-    return Panel(
-        Group(grid, Rule(style="dim"), latest),
-        title="listen",
-        subtitle="press any key to stop",
-    )
-
-
 @app.command()
 def listen(
     duration: float = typer.Option(
@@ -135,14 +88,13 @@ def listen(
 
     With --stt, each utterance found by VAD is transcribed by whisper.
     With --tts, each transcript is then spoken back with kokoro.
+    Listening, transcription, and synthesis run in separate threads.
     Stops after --duration, on any keypress, or on Ctrl-C.
     """
     if stt and not vad:
         raise typer.BadParameter("--stt needs --vad to find utterances.")
     if tts and not stt:
         raise typer.BadParameter("--tts needs --stt to have text to speak.")
-    config = StreamConfig()
-    # Load the model before opening the stream so blocks don't pile up meanwhile.
     try:
         vad_config = VadConfig(
             threshold=threshold,
@@ -151,95 +103,34 @@ def listen(
         )
     except ValidationError as e:  # report as a CLI usage error, not a traceback
         raise typer.BadParameter(str(e)) from None
+
+    # Wire up the components (see services/pipeline.py). Everything
+    # subscribes to the bus before any thread starts publishing.
+    bus = Bus()
+    components: list[Component] = [
+        pipeline.Listen(bus, vad_config if vad else None, duration)
+    ]
+    if stt:
+        components.append(pipeline.Stt(bus))
+    if tts:
+        components.append(pipeline.Tts(bus, voice))
     tty = sys.stdout.isatty()
+    ui = RichUI(bus, vad=vad, stt=stt, tts=tts) if tty else YamlUI(bus)
+
+    # Load models before starting, so no audio piles up meanwhile.
     with Console().status("Loading models…") if tty else nullcontext():
-        detect = stt_service.vad_detector(vad_config) if vad else None
-        whisper = stt_service.load_whisper() if stt else None
-        speaker: TTS | None = None
-        if tts:
-            speaker = kokoro.KokoroTTS()
-            # A voice's first letter is its accent (af_alloy -> "a"), so use
-            # the matching phoneme rules.
-            speaker.initialize(voice=voice, lang_code=voice[0])
-    # While our own speech plays, the mic hears it; left alone, VAD would
-    # trigger and we'd transcribe and repeat ourselves forever. So blocks
-    # captured before `mute_until` (input stream time, like Block.adc_time)
-    # are replaced by silence. The margin covers output latency and echo.
-    mute_until = 0.0
-    mute_margin = 0.3  # seconds
-    synth_seconds: float | None = None  # of the latest spoken reply
-    collect = stt_service.speech_collector(pre_speech_ms=300)
-    transcript: Transcript | None = None  # the latest one
-    speaking = False if vad else None  # None means "VAD off"
-    last: VadEvent | None = None
-    q: queue.Queue[Block] = queue.Queue()
-    n_blocks = round(duration / config.block_duration) if duration > 0 else None
+        for c in components:
+            c.setup()
+    for c in components:
+        c.start()
     try:
-        with (
-            stt_service.input_stream(q, config) as stream,
-            Live(auto_refresh=False) if tty else nullcontext() as live,
-            keypress() as key_pressed,
-        ):
-            while True:
-                b = q.get()
-                if key_pressed() or (n_blocks is not None and b.index >= n_blocks):
-                    break
-                # Computed here, in the consumer, not in the audio callback.
-                level = stt_service.rms(b.indata)
-                muted = b.adc_time < mute_until
-                if muted:
-                    # Silence rather than skipping the block: VAD counts
-                    # samples, so its timestamps stay in step with the stream.
-                    b.indata = np.zeros_like(b.indata)
-                if detect:
-                    b.event = detect(b.indata)
-                    if b.event:
-                        last, speaking = b.event, b.event.kind == "start"
-                new_transcript = None
-                if whisper and (utterance := collect(b)):
-                    # Blocks the loop while whisper runs; meanwhile the audio
-                    # callback keeps queueing blocks, and we catch up after.
-                    new_transcript = transcript = stt_service.transcribe(
-                        whisper, utterance
-                    )
-                spoken = None
-                if speaker and new_transcript and new_transcript.text:
-                    t0 = time.perf_counter()
-                    speech = speaker.synthesize(new_transcript.text)
-                    synth_seconds = time.perf_counter() - t0
-                    sd.play(speech, speaker.samplerate)  # returns immediately
-                    played = len(speech) / speaker.samplerate
-                    mute_until = stream.time + played + mute_margin
-                    spoken = {
-                        "voice": voice,
-                        "duration": played,
-                        "synth_seconds": synth_seconds,
-                    }
-                if live:
-                    if not speaker:
-                        tts_status = "[dim]off[/]"
-                    else:
-                        playing = stream.time < mute_until
-                        tts_status = (
-                            "[cyan]🔊 speaking[/]" if playing else "[dim]idle[/]"
-                        )
-                        if synth_seconds is not None:
-                            tts_status += f"  [dim]last synth {synth_seconds:.3f} s[/]"
-                    live.update(
-                        render(b, level, speaking, last, transcript, stt, tts_status),
-                        refresh=True,
-                    )
-                else:  # one YAML list item per block, without the raw samples
-                    row = b.model_dump(exclude={"indata", "status"}) | {"rms": level}
-                    if new_transcript:  # only on the block that ended speech
-                        row["transcript"] = new_transcript.model_dump(mode="json")
-                    if spoken:
-                        row["tts"] = spoken
-                    if muted:
-                        row["muted"] = True
-                    typer.echo(yaml.safe_dump([row], sort_keys=False), nl=False)
+        ui.run()  # main thread, until Shutdown (key, --duration, or a failure)
     except KeyboardInterrupt:
-        pass
+        bus.publish(Shutdown(reason="ctrl-c"))
+    finally:
+        bus.publish(Shutdown())  # in case the UI stopped for another reason
+        for c in components:
+            c.join(timeout=5)
 
 
 @app.command()

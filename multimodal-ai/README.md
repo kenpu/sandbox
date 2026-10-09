@@ -41,13 +41,19 @@ The targets are thin wrappers around `uv run main ...`; see `uv run main sound <
 for every option. In a terminal, output is a live [rich](https://github.com/Textualize/rich) UI;
 when piped, it is plain YAML, e.g. `uv run main sound listen --stt > log.yaml`.
 
+`listen` runs as concurrent components passing messages over a bus
+(`Block -> Utterance -> Transcript -> Speech`); see `services/pipeline.py`.
+
 ## Layout
 
 ```
 src/multimodal_ai/
   main.py              # the `main` CLI; mounts the sub-apps, loads .env
   apps/sound.py        # `main sound ...` commands (CLI only)
-  services/types.py    # pydantic data models
+  ui.py                # listen UIs: RichUI (terminal) and YamlUI (piped)
+  services/types.py    # pydantic data models and pipeline messages
+  services/bus.py      # message Bus and the thread-based Component
+  services/pipeline.py # listen's components: Listen, Stt, Tts
   services/stt.py      # audio capture, VAD, whisper
   services/tts/        # the TTS interface, plus kokoro.py and chatterbox.py
 notes/                 # task notes

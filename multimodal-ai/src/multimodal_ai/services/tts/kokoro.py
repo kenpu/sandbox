@@ -5,7 +5,7 @@ import warnings
 import numpy as np
 
 from multimodal_ai.services.tts import TTS
-from multimodal_ai.services.types import Voice
+from multimodal_ai.services.types import SpokenWord, Voice
 
 REPO_ID = "hexgrad/Kokoro-82M"
 
@@ -84,10 +84,27 @@ class KokoroTTS(TTS):
         self.synthesize("Hi.")
 
     def synthesize(self, text: str) -> np.ndarray:
+        return self.synthesize_timed(text)[0]
+
+    def synthesize_timed(self, text: str) -> tuple[np.ndarray, list[SpokenWord]]:
         # The pipeline splits long text into chunks and yields one result per
-        # chunk; each has .graphemes (text), .phonemes, and .audio (a tensor).
-        chunks = [
-            r.audio.cpu().numpy()
-            for r in self.pipeline(text, voice=self.voice, speed=self.speed)
-        ]
-        return np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
+        # chunk; each has .graphemes (text), .phonemes, .audio (a tensor), and
+        # .tokens: misaki tokens whose start_ts/end_ts (seconds within the
+        # chunk) come from the model's predicted phoneme durations.
+        chunks, words, offset = [], [], 0.0
+        for r in self.pipeline(text, voice=self.voice, speed=self.speed):
+            audio = r.audio.cpu().numpy()
+            for t in r.tokens or []:
+                words.append(
+                    SpokenWord(
+                        text=t.text,
+                        whitespace=t.whitespace,
+                        start=None if t.start_ts is None else offset + t.start_ts,
+                        end=None if t.end_ts is None else offset + t.end_ts,
+                    )
+                )
+            chunks.append(audio)
+            offset += len(audio) / self.samplerate
+        if not chunks:
+            return np.zeros(0, dtype=np.float32), []
+        return np.concatenate(chunks), words

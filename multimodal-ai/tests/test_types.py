@@ -86,10 +86,27 @@ def test_transcribe_keeps_all_info():
     for b in blocks:
         b.indata[:] = 0  # silence: we check structure, not text
     whisper = stt.load_whisper("tiny.en", device="cpu", compute_type="int8")
-    t = stt.transcribe(whisper, blocks)
+    utterance = stt.make_utterance(7, blocks)
+    assert (utterance.first_block, utterance.last_block) == (10, 40)
+    t = stt.transcribe(whisper, utterance)
+    assert t.utterance_id == 7
     assert t.start == 10 * 0.032
     assert t.duration == 31 * 0.032
     assert t.info["language"] == "en"
     assert t.info["transcription_options"]["beam_size"] == 1
     assert t.info["transcription_options"]["word_timestamps"] is True
     assert all("no_speech_prob" in s for s in t.segments)
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("Terminate.", "terminate"),
+        (" TERMINATE! ", "terminate"),
+        ("Terminate…", "terminate"),
+        ("Terminate now.", "terminate now"),
+        ("Don't terminate", "dont terminate"),
+    ],
+)
+def test_normalize(text, expected):
+    assert stt.normalize(text) == expected

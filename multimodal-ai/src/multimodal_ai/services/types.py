@@ -76,10 +76,24 @@ class VadEvent(BaseModel):
         return self.sample / 16000
 
 
+# ---------------------------------------------------------------------------
+# Messages. The `listen` pipeline (services/pipeline.py) is a set of threads
+# that pass these models through a Bus. Data flows
+#
+#     Block -> Utterance -> Transcript -> Speech
+#
+# and each step keeps the identity/timing of its input next to its own output
+# (e.g. Transcript carries utterance_id, start, duration from the Utterance),
+# so a consumer at the end of the chain can relate results back to the audio.
+# Playback and Shutdown are control messages.
+# ---------------------------------------------------------------------------
+
+
 class Block(BaseModel):
     """One block of captured audio plus its timing info.
 
-    Produced in the PortAudio callback, consumed from a queue elsewhere.
+    Produced in the PortAudio callback, then annotated (rms, muted, event) by
+    the listen component, which publishes it for UIs to show.
     """
 
     # pydantic only knows how to validate standard types. To hold a numpy
@@ -93,17 +107,38 @@ class Block(BaseModel):
     status: str  # "" normally; e.g. "input overflow" if samples were dropped
     indata: np.ndarray  # mono samples: shape (512,), dtype float32 in [-1, 1]
 
-    # Filled in later by the consumer, if VAD is on. Pydantic models are
-    # mutable: `block.event = ...` works (it is not re-validated by default).
-    event: VadEvent | None = None
+    # Annotations filled in later by the listen component. Pydantic models
+    # are mutable: `block.rms = ...` works (it is not re-validated by default).
+    rms: float = 0.0  # level of the captured audio (before muting)
+    muted: bool = False  # samples replaced by silence while we play speech
+    event: VadEvent | None = None  # set when VAD is on
+
+
+class Utterance(BaseModel):
+    """One stretch of speech: the audio of the blocks from VAD start to end,
+    plus a pre-speech buffer. Published by listen, consumed by stt."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    id: int  # 0, 1, 2, ... in order; later messages refer to it
+    first_block: int  # Block.index range covered, inclusive
+    last_block: int
+    start: float  # stream time (s) of the first sample
+    duration: float  # seconds
+    audio: np.ndarray  # mono float32 at 16 kHz
 
 
 class Transcript(BaseModel):
-    """Whisper's transcription of one utterance (VAD start .. end)."""
+    """Whisper's transcription of one utterance. Published by stt."""
 
+    # From the input Utterance:
+    utterance_id: int
     start: float  # stream time (s) of the first sample, incl. pre-speech buffer
     duration: float  # seconds of audio sent to whisper
+
+    # From whisper:
     text: str  # all segment texts joined: the part we display
+    transcribe_seconds: float  # how long whisper took
 
     # Everything else whisper returned, kept for later. faster-whisper gives
     # dataclasses (Segment, TranscriptionInfo); we store them as plain dicts
@@ -114,6 +149,50 @@ class Transcript(BaseModel):
     # place them on the stream clock (the same clock as VadEvent.seconds).
     segments: list[dict[str, Any]]
     info: dict[str, Any]
+
+
+class SpokenWord(BaseModel):
+    """A word (or punctuation mark) in synthesized speech, with its timing.
+
+    Joining text + whitespace over all words gives back the spoken text.
+    """
+
+    text: str
+    whitespace: str  # what follows it: " " or ""
+    start: float | None  # seconds from the start of the speech audio;
+    end: float | None  # None if the engine gave no timing for this token
+
+
+class Speech(BaseModel):
+    """Synthesized speech for one transcript. Published by tts; the UI plays it."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    # From the input Transcript:
+    utterance_id: int
+    text: str
+
+    # From the TTS engine:
+    voice: str
+    samplerate: int
+    audio: np.ndarray  # mono float32 at `samplerate`
+    duration: float  # seconds of audio
+    synth_seconds: float  # how long synthesis took
+    words: list[SpokenWord] = []  # word timings, if the engine provides them
+
+
+class Playback(BaseModel):
+    """The UI started playing `duration` seconds of speech. listen mutes the
+    mic meanwhile, so we don't transcribe (and repeat) our own voice."""
+
+    utterance_id: int
+    duration: float
+
+
+class Shutdown(BaseModel):
+    """Stop everything. Every component receives it, whatever it subscribed to."""
+
+    reason: str = ""
 
 
 class Voice(BaseModel):

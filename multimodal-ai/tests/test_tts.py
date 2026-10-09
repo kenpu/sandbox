@@ -26,3 +26,14 @@ def test_roundtrip_through_whisper(engine_class):
     segments, _ = stt.load_whisper().transcribe(audio16, language="en", beam_size=1)
     text = "".join(s.text for s in segments).lower()
     assert "hello world" in text and "test" in text
+
+
+def test_kokoro_word_timings():
+    engine = KokoroTTS()
+    engine.initialize()
+    text = "Hello there, the weather is 10 degrees today!"
+    audio, words = engine.synthesize_timed(text)
+    assert "".join(w.text + w.whitespace for w in words) == text
+    starts = [w.start for w in words]
+    assert all(s is not None for s in starts) and starts == sorted(starts)
+    assert words[-1].end <= len(audio) / engine.samplerate
