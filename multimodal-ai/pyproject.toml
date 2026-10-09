@@ -23,6 +23,15 @@ dependencies = [
     "typer>=0.27.3",
 ]
 
+[project.optional-dependencies]
+# A second STT engine (`listen --stt-engine faster-whisper`):
+# `uv sync --extra faster-whisper`. ctranslate2 is listed so that the source
+# below applies (uv sources only apply to direct dependencies).
+faster-whisper = [
+    "faster-whisper>=1.2.1",
+    "ctranslate2>=4.8.2",
+]
+
 [project.scripts]
 main = "multimodal_ai.main:app"
 
@@ -37,6 +46,13 @@ dev = [
 ]
 
 [tool.uv.sources]
+# PyPI's ctranslate2 wheels for ARM Linux have no CUDA. On the DGX Spark, use a
+# local build with CUDA for the GB10 (how it was built: ~/src/README.md).
+# The wheel is for Python 3.13 only. Everything else gets the PyPI wheel
+# (x86 Linux wheels include CUDA).
+ctranslate2 = [
+    { path = "/home/kenpu/src/opt/wheels/ctranslate2-4.8.2-cp313-cp313-linux_aarch64.whl", marker = "sys_platform == 'linux' and platform_machine == 'aarch64' and python_version == '3.13'" },
+]
 en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
 
 [tool.uv]

@@ -96,21 +96,25 @@ class Listen(Component):
 
 
 class Stt(Component):
-    """Utterance -> Transcript, with whisper. Saying just "terminate"
-    (ignoring case and punctuation) shuts everything down."""
+    """Utterance -> Transcript, with an STT engine (see stt.ENGINES). Saying
+    just "terminate" (ignoring case and punctuation) shuts everything down."""
 
     stop_phrase = "terminate"
 
     consumes = (Utterance,)
 
-    def __init__(self, bus: Bus) -> None:
+    def __init__(
+        self, bus: Bus, engine: str = "transformers", model: str = "small.en"
+    ) -> None:
         super().__init__(bus, "stt")
+        self.engine_name = engine
+        self.model = model
 
     def setup(self) -> None:
-        self.whisper = stt.load_whisper()
+        self.engine = stt.load(self.engine_name, self.model)
 
     def handle(self, msg: Utterance) -> None:
-        transcript = stt.transcribe(self.whisper, msg)
+        transcript = stt.transcribe(self.engine, msg)
         self.bus.publish(transcript)  # first, so UIs still show it
         if stt.normalize(transcript.text) == self.stop_phrase:
             self.bus.publish(Shutdown(reason=f'voice command "{self.stop_phrase}"'))

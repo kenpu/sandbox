@@ -65,6 +65,13 @@ def devices(
     Console().print(table)
 
 
+class SttEngine(str, Enum):
+    """STT engines for `listen` (keys of stt.ENGINES)."""
+
+    transformers = "transformers"
+    faster_whisper = "faster-whisper"
+
+
 @app.command()
 def listen(
     duration: float = typer.Option(
@@ -79,6 +86,14 @@ def listen(
     stt: bool = typer.Option(
         False, "--stt/--no-stt", help="Transcribe each utterance (needs --vad)."
     ),
+    stt_engine: SttEngine = typer.Option(
+        SttEngine.transformers, "--stt-engine", help="Speech-to-text engine."
+    ),
+    stt_model: str = typer.Option(
+        "small.en",
+        "--stt-model",
+        help="Whisper model, e.g. tiny.en, small.en, large-v3.",
+    ),
     tts: bool = typer.Option(
         False, "--tts/--no-tts", help="Speak each transcript back (needs --stt)."
     ),
@@ -86,7 +101,8 @@ def listen(
 ) -> None:
     """Listen on the default input (mono, 16 kHz, 512-sample blocks); show RMS.
 
-    With --stt, each utterance found by VAD is transcribed by whisper.
+    With --stt, each utterance found by VAD is transcribed by whisper
+    (--stt-engine faster-whisper needs `uv sync --extra faster-whisper`).
     With --tts, each transcript is then spoken back with kokoro.
     Listening, transcription, and synthesis run in separate threads.
     Stops after --duration, on any keypress, or on Ctrl-C.
@@ -111,7 +127,7 @@ def listen(
         pipeline.Listen(bus, vad_config if vad else None, duration)
     ]
     if stt:
-        components.append(pipeline.Stt(bus))
+        components.append(pipeline.Stt(bus, stt_engine.value, stt_model))
     if tts:
         components.append(pipeline.Tts(bus, voice))
     tty = sys.stdout.isatty()

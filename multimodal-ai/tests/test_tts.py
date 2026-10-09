@@ -23,7 +23,7 @@ def test_roundtrip_through_whisper(engine_class):
     # Resample to 16 kHz for whisper (linear interpolation is fine for a test).
     t16 = np.arange(0, len(audio), engine.samplerate / 16000)
     audio16 = np.interp(t16, np.arange(len(audio)), audio).astype(np.float32)
-    words = stt.load_whisper().transcribe(audio16)
+    words = stt.load("transformers").transcribe(audio16)
     text = "".join(w.word for w in words).lower()
     assert "hello world" in text and "test" in text
 
