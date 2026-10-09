@@ -201,14 +201,21 @@ class Whisper:
         pieces = [tokenizer.decode([t]) for t in tokens]
         starts = [i for i, p in enumerate(pieces) if i == 0 or p.startswith(" ")]
         bounds = [*starts, len(tokens)]
-        return [
-            HeardWord(
-                word=tokenizer.decode(tokens[a:b]),
-                start=float(times[a]),
-                end=float(times[b]),
+        words = []
+        for a, b in itertools.pairwise(bounds):
+            # The word ends where its trailing punctuation starts: "rain." ends
+            # with "rain", not after the pause the "." gets aligned into.
+            end = b
+            while end - 1 > a and normalize(pieces[end - 1]) == "":
+                end -= 1
+            words.append(
+                HeardWord(
+                    word=tokenizer.decode(tokens[a:b]),
+                    start=float(times[a]),
+                    end=float(times[end]),
+                )
             )
-            for a, b in itertools.pairwise(bounds)
-        ]
+        return words
 
     def _align(self, encoded, tokens: list[int], num_frames: int) -> np.ndarray:
         """When each token starts, in seconds, plus when the text ends.
