@@ -3,7 +3,7 @@
 A learning playground for local speech AI, driven from one CLI (`main`):
 
 - **listen**: live microphone level, voice activity detection ([Silero VAD](https://github.com/snakers4/silero-vad)),
-  speech-to-text ([faster-whisper](https://github.com/SYSTRAN/faster-whisper), with word timestamps),
+  speech-to-text ([Whisper](https://huggingface.co/openai/whisper-small.en) on torch via transformers, with word timestamps),
   and optionally speaking each transcript back.
 - **say**: text-to-speech with [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (54 voices)
   or [Chatterbox](https://huggingface.co/ResembleAI/chatterbox) (clones a voice from a short recording).
@@ -70,5 +70,5 @@ To add a sub-app: create `apps/<name>.py` with `app = typer.Typer()` and mount i
 - `override-dependencies`: chatterbox pins `torch==2.6.0`; overridden to `>=2.9`.
 - `constraint-dependencies`: `setuptools<81`, because chatterbox's watermarker still imports `pkg_resources`.
 
-`nvidia-cublas-cu12` is there because faster-whisper's CTranslate2 is built for CUDA 12;
-`stt.load_whisper()` preloads it.
+Speech-to-text uses Whisper through `transformers` rather than faster-whisper: faster-whisper
+runs on CTranslate2, whose ARM (aarch64) wheels have no CUDA, while torch's do.

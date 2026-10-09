@@ -81,21 +81,37 @@ def test_speech_collector_keeps_pre_speech_buffer():
     assert [b.index for b in done[0]] == list(range(10, 26))
 
 
-def test_transcribe_keeps_all_info():
+def test_transcribe_keeps_utterance_timing():
     blocks = [make_block(i) for i in range(10, 41)]
     for b in blocks:
         b.indata[:] = 0  # silence: we check structure, not text
-    whisper = stt.load_whisper("tiny.en", device="cpu", compute_type="int8")
+    whisper = stt.load_whisper("tiny.en", device="cpu")
     utterance = stt.make_utterance(7, blocks)
     assert (utterance.first_block, utterance.last_block) == (10, 40)
     t = stt.transcribe(whisper, utterance)
     assert t.utterance_id == 7
     assert t.start == 10 * 0.032
     assert t.duration == 31 * 0.032
-    assert t.info["language"] == "en"
-    assert t.info["transcription_options"]["beam_size"] == 1
-    assert t.info["transcription_options"]["word_timestamps"] is True
-    assert all("no_speech_prob" in s for s in t.segments)
+    assert t.text == "".join(w.word for w in t.words).strip()
+
+
+def test_whisper_word_timings():
+    # Word timings need real speech; synthesize some.
+    from multimodal_ai.services.tts.kokoro import KokoroTTS
+
+    engine = KokoroTTS()
+    engine.initialize()
+    audio = engine.synthesize("The quick brown fox jumps over the lazy dog.")
+    t16 = np.arange(0, len(audio), engine.samplerate / 16000)
+    audio16 = np.interp(t16, np.arange(len(audio)), audio).astype(np.float32)
+    words = stt.load_whisper("tiny.en", device="cpu").transcribe(audio16)
+    assert (
+        "".join(w.word for w in words).strip().lower().startswith("the quick brown fox")
+    )
+    starts = [w.start for w in words]
+    assert starts == sorted(starts)
+    assert all(w.start <= w.end for w in words)
+    assert words[-1].end <= len(audio16) / 16000 + 0.1
 
 
 @pytest.mark.parametrize(

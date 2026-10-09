@@ -32,7 +32,9 @@ sync: ## Create .venv and install the Python dependencies
 	uv sync
 
 models: ## Pre-download model weights (~4 GB) into ~/.cache/huggingface
-	uv run hf download Systran/faster-whisper-small.en
+	uv run hf download openai/whisper-small.en config.json generation_config.json \
+		model.safetensors preprocessor_config.json tokenizer.json tokenizer_config.json \
+		vocab.json merges.txt normalizer.json added_tokens.json special_tokens_map.json
 	uv run hf download hexgrad/Kokoro-82M config.json kokoro-v1_0.pth \
 		voices/af_heart.pt voices/af_alloy.pt
 	uv run hf download ResembleAI/chatterbox ve.safetensors t3_cfg.safetensors \

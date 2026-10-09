@@ -10,10 +10,8 @@ requires-python = ">=3.13"
 dependencies = [
     "chatterbox-tts>=0.1.7",
     "en-core-web-sm",
-    "faster-whisper>=1.2.1",
     "kokoro>=0.9.4",
     "numpy>=2.5.3",
-    "nvidia-cublas-cu12>=12.9.2.10",
     "pydantic>=2.14.0",
     "python-dotenv>=1.2.4",
     "pyyaml>=6.0.3",
@@ -21,6 +19,7 @@ dependencies = [
     "silero-vad>=6.2.3",
     "sounddevice>=0.5.6",
     "soundfile>=0.14.0",
+    "transformers>=5.2.0",
     "typer>=0.27.3",
 ]
 

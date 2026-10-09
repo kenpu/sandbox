@@ -9,7 +9,7 @@ Why pydantic?
 - `Model.model_validate(dict)` goes the other way, e.g. after `yaml.safe_load`.
 """
 
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -128,6 +128,15 @@ class Utterance(BaseModel):
     audio: np.ndarray  # mono float32 at 16 kHz
 
 
+class HeardWord(BaseModel):
+    """A word whisper heard, with its timing. Joining `word` over all words
+    gives back the text (each word carries its leading space)."""
+
+    word: str  # e.g. " world," (punctuation stays on its word)
+    start: float  # seconds from the start of the transcribed audio
+    end: float
+
+
 class Transcript(BaseModel):
     """Whisper's transcription of one utterance. Published by stt."""
 
@@ -140,15 +149,9 @@ class Transcript(BaseModel):
     text: str  # all segment texts joined: the part we display
     transcribe_seconds: float  # how long whisper took
 
-    # Everything else whisper returned, kept for later. faster-whisper gives
-    # dataclasses (Segment, TranscriptionInfo); we store them as plain dicts
-    # via dataclasses.asdict, so this module needn't import faster_whisper
-    # (slow). `Any` means pydantic accepts the values without checking them.
-    # Each segment has "words": a list of {start, end, word, probability}.
-    # Word times are seconds from the start of *this* audio; add `start` to
-    # place them on the stream clock (the same clock as VadEvent.seconds).
-    segments: list[dict[str, Any]]
-    info: dict[str, Any]
+    # Each word, timed in seconds from the start of *this* audio; add `start`
+    # to place it on the stream clock (the same clock as VadEvent.seconds).
+    words: list[HeardWord]
 
 
 class SpokenWord(BaseModel):
