@@ -2,13 +2,36 @@
 
 Install with `uv sync --extra faster-whisper`. On ARM Linux (the DGX Spark)
 that installs a CTranslate2 built with CUDA from ~/src (see ~/src/README.md):
-the PyPI wheels for ARM are CPU-only. Elsewhere it is the PyPI wheel.
+the PyPI wheels for ARM are CPU-only. Elsewhere it is the PyPI wheel, which
+on x86 needs CUDA 12's cuBLAS (see `_preload_cublas12`).
 """
+
+import ctypes
+from pathlib import Path
 
 import numpy as np
 
 from multimodal_ai.services.stt import STT
 from multimodal_ai.services.types import HeardWord
+
+
+def _preload_cublas12() -> None:
+    """Make CUDA 12's cuBLAS visible to CTranslate2, if it is installed.
+
+    PyPI's x86 CTranslate2 is built against CUDA 12 and dlopens libcublas.so.12,
+    but torch brought CUDA 13. The `nvidia-cublas-cu12` wheel (x86 only, in the
+    faster-whisper extra) supplies it, off the loader path; loading it by full
+    path with RTLD_GLOBAL lets CTranslate2's dlopen find it. Our ARM build links
+    CUDA 13 itself, so there this finds nothing and does nothing.
+    """
+    try:
+        import nvidia.cublas
+    except ImportError:
+        return
+    for root in nvidia.cublas.__path__:
+        for lib in ("libcublasLt.so.12", "libcublas.so.12"):
+            if (path := Path(root) / "lib" / lib).exists():
+                ctypes.CDLL(str(path), mode=ctypes.RTLD_GLOBAL)
 
 
 class FasterWhisper(STT):
@@ -25,6 +48,7 @@ class FasterWhisper(STT):
             raise ImportError(
                 "the faster-whisper engine is optional: uv sync --extra faster-whisper"
             ) from e
+        _preload_cublas12()
 
         self.device = device or (
             "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"

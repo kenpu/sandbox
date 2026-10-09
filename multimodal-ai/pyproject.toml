@@ -30,6 +30,9 @@ dependencies = [
 faster-whisper = [
     "faster-whisper>=1.2.1",
     "ctranslate2>=4.8.2",
+    # PyPI's x86 ctranslate2 loads libcublas.so.12 (CUDA 12); torch only
+    # brings CUDA 13's. FasterWhisper preloads this one. (Our ARM build uses CUDA 13.)
+    "nvidia-cublas-cu12>=12.9.2.10 ; platform_machine == 'x86_64'",
 ]
 
 [project.scripts]

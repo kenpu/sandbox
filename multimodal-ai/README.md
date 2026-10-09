@@ -85,6 +85,8 @@ To add a sub-app: create `apps/<name>.py` with `app = typer.Typer()` and mount i
   CUDA build instead: `[tool.uv.sources]` points `ctranslate2` at
   `~/src/opt/wheels/ctranslate2-4.8.2-cp313-cp313-linux_aarch64.whl` for Python 3.13 on
   aarch64 Linux. How that wheel was built: `~/src/README.md`. Other platforms use PyPI.
+  PyPI's x86 CTranslate2 is built for CUDA 12, so on x86 the extra also installs
+  `nvidia-cublas-cu12`, which the engine preloads (torch itself brings CUDA 13).
 
 A plain `uv sync` (`make sync`) removes the extra again; use `make sync-faster-whisper`.
 
