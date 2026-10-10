@@ -25,7 +25,6 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
-from multimodal_ai.keyboard import keypress
 from multimodal_ai.services.bus import Bus
 from multimodal_ai.services.types import (
     Block,
@@ -36,6 +35,7 @@ from multimodal_ai.services.types import (
     Utterance,
     VadEvent,
 )
+from multimodal_ai.services.ux.keyboard import keypress
 
 
 def level_bar(rms: float, width: int = 40) -> str:

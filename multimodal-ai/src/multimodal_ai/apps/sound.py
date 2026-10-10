@@ -18,7 +18,6 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 
-from multimodal_ai.keyboard import keypress
 from multimodal_ai.services import pipeline
 from multimodal_ai.services import stt as stt_service
 from multimodal_ai.services.bus import Bus, Component
@@ -27,7 +26,8 @@ from multimodal_ai.services.types import (
     Shutdown,
     VadConfig,
 )
-from multimodal_ai.ui import RichUI, YamlUI, level_bar
+from multimodal_ai.services.ux.keyboard import keypress
+from multimodal_ai.services.ux.ui import RichUI, YamlUI, level_bar
 
 app = typer.Typer(help="Sound input/output.", no_args_is_help=True)
 

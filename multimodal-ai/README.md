@@ -50,12 +50,12 @@ when piped, it is plain YAML, e.g. `uv run main sound listen --stt > log.yaml`.
 src/multimodal_ai/
   main.py              # the `main` CLI; mounts the sub-apps, loads .env
   apps/sound.py        # `main sound ...` commands (CLI only)
-  ui.py                # listen UIs: RichUI (terminal) and YamlUI (piped)
   services/types.py    # pydantic data models and pipeline messages
   services/bus.py      # message Bus and the thread-based Component
   services/pipeline.py # listen's components: Listen, Stt, Tts
   services/stt/        # audio capture, VAD, the STT interface, transformers_whisper.py
   services/tts/        # the TTS interface, plus kokoro.py and chatterbox.py
+  services/ux/         # ui.py: listen UIs RichUI (terminal) and YamlUI (piped); keyboard.py
 notes/                 # task notes
 tests/
 ```

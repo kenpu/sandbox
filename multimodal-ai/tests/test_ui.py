@@ -4,7 +4,7 @@ import numpy as np
 
 from multimodal_ai.services.bus import Bus
 from multimodal_ai.services.types import Speech, SpokenWord
-from multimodal_ai.ui import RichUI
+from multimodal_ai.services.ux.ui import RichUI
 
 
 def speech() -> Speech:
